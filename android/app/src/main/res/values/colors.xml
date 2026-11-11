@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's scaffold background. The UI is dark whatever the system is
+         set to, so the launch window uses this rather than the platform's
+         light/dark colorBackground, which flashed white on a light device. -->
+    <color name="launch_ground">#101510</color>
+</resources>
