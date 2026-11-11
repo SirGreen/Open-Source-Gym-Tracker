@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    Replaced by the value of `flutter build web --base-href`. On GitHub Pages
+    the app lives under /<repo-name>/, and the deploy workflow passes that in.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Chalk: a training log for a pull/push/legs plan. Your log stays in this browser.">
+  <meta name="theme-color" content="#0F1511">
+
+  <!-- Added to an iPhone home screen, it opens like an app, and Safari stops
+       clearing its data after a week away. -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Chalk">
+  <link rel="apple-touch-icon" href="icons/Icon-maskable-192.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Chalk</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- What shows while the app loads, matched to the system theme so a dark
+       phone does not flash white. -->
+  <style>
+    html, body { margin: 0; background: #F5FBF4; }
+    @media (prefers-color-scheme: dark) {
+      html, body { background: #0F1511; }
+    }
+  </style>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

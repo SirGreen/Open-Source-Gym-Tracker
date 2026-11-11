@@ -1,7 +1,7 @@
 # Chalk
 
-A training log for one person's pull/push/legs plan. Android, Flutter, offline.
-Nothing leaves the phone unless you export it.
+A training log for one person's pull/push/legs plan. Android and the browser,
+Flutter, offline. Nothing leaves the device unless you export it.
 
 It is a log rather than a workout app: it does not prescribe programmes, and it
 does not guess. Where it cannot work something out it says so instead of
@@ -55,9 +55,10 @@ shows is what pressing Start produces. There is one code path, not two.
 ```bash
 flutter pub get
 flutter run                     # debug, on a connected device or emulator
-flutter test                    # 286 tests
-flutter analyze                 # expected to be clean
+flutter test                    # 317 tests
+flutter analyze
 flutter build apk --release
+flutter build web --release     # the browser version, into build/web
 ```
 
 Installing a **debug** build over a release one wipes the log, so update a real
@@ -79,6 +80,7 @@ lib/
     progression.dart      Load maths, progression rules, warm-up ramps,
                             volume landmarks, trend verdicts. No Flutter.
     storage.dart          One JSON document, written atomically
+    storage_web.dart      The same document in IndexedDB, for the browser
     seed.dart             The plan and exercise library this install ships with
     rest_timer.dart       Rest countdown, live notification, wakelock
     notifications.dart    Rest alerts and scheduled training reminders
@@ -110,3 +112,28 @@ the phone in a fortnight — that export is the one that matters.
 A backup written by a newer version of the app is refused rather than opened,
 because opening it would silently drop whatever that version added. Raise
 `Storage.schemaVersion` only for a change an older build would get *wrong*.
+
+## The browser version
+
+The same app, built for the web and published to GitHub Pages by
+[.github/workflows/deploy-web.yml](.github/workflows/deploy-web.yml) on every
+push to `main`. It can be added to a phone's home screen and run like an app.
+
+There is no server. The browser build keeps the same JSON document in the
+browser's own database (IndexedDB) instead of a file — see
+[lib/data/storage_web.dart](lib/data/storage_web.dart) — so its log is separate
+from the phone's. Move between them with Export / Import backup.
+
+Browser storage is more fragile than a file on a phone:
+
+- **Clearing site data or cookies deletes it**, and a private window forgets it
+  on close.
+- **Safari deletes it after seven days without a visit**, unless the page has
+  been added to the home screen.
+- **It belongs to one browser at one address.** Chrome cannot see Edge's copy,
+  and moving the site to another URL leaves the data behind.
+
+After the first finished workout the app asks the browser to keep its data
+through low-disk clean-ups (Chrome decides by itself, Firefox asks). Exports
+download as files. The status-bar timer and the training reminders are phone
+features and are hidden in the browser.

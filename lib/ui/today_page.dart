@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../data/app_state.dart';
 import '../models/models.dart';
+import '../utils/device.dart';
 import '../utils/formatting.dart' as fmt;
 import 'day_preview_page.dart';
 import 'goal_detail_page.dart';
@@ -1240,9 +1241,9 @@ class _BackupNagCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               days == null
-                  ? 'Nothing has ever left this phone. The automatic snapshots '
-                        'live here too, so they go with it.'
-                  : 'Nothing has left this phone in $days days. The automatic '
+                  ? 'Nothing has ever left $thisDevice. The automatic '
+                        'snapshots live here too, so they go with it.'
+                  : 'Nothing has left $thisDevice in $days days. The automatic '
                         'snapshots live here too, so they go with it.',
               style: TextStyle(color: scheme.onErrorContainer),
             ),

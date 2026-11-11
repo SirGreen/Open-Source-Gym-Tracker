@@ -45,10 +45,10 @@ extension SettingsAndBackup on AppState {
     }
   }
 
-  Future<List<File>> autoBackups() => _storage.listAutoBackups();
+  Future<List<Snapshot>> autoBackups() => _storage.listAutoBackups();
 
-  Future<void> restoreAutoBackup(File file) async {
-    final decoded = jsonDecode(await file.readAsString());
+  Future<void> restoreAutoBackup(Snapshot snapshot) async {
+    final decoded = jsonDecode(await snapshot.read());
     if (decoded is! Map) throw const FormatException('Unreadable snapshot');
     importFrom(Map<String, dynamic>.from(decoded));
   }
@@ -63,12 +63,12 @@ extension SettingsAndBackup on AppState {
   /// The on-device snapshots go with the phone, so nagging is warranted.
   bool get exportOverdue => daysSinceExport == null || daysSinceExport! >= 14;
 
-  Future<String> exportToFile() async {
+  Future<XFile> exportToFile() async {
     final stamp = now.toIso8601String().split('T').first;
     final f = await _storage.writeExport(toJson(), 'chalk-backup-$stamp.json');
     settings.lastExportedAt = now;
     _touch();
-    return f.path;
+    return f;
   }
 
   /// The log as one row per completed set, for a spreadsheet.
@@ -122,12 +122,11 @@ extension SettingsAndBackup on AppState {
     return rows.join('\r\n');
   }
 
-  Future<String> exportCsvToFile() async {
+  Future<XFile> exportCsvToFile() {
     final stamp = _csvDate(now);
-    final f = await _storage.writeTextExport(toCsv(), 'chalk-log-$stamp.csv');
     // Not recorded as a backup: restoring from this is impossible, so letting
     // it silence the "nothing has left this phone" warning would be a lie.
-    return f.path;
+    return _storage.writeTextExport(toCsv(), 'chalk-log-$stamp.csv');
   }
 
   static String _csvDate(DateTime d) =>

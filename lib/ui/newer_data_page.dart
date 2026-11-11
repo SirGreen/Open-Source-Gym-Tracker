@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../data/app_state.dart';
 import '../data/storage.dart';
+import '../utils/device.dart';
+import 'widgets/send_file.dart';
 
 /// Shown instead of the app when the database on this phone was written by a
 /// newer version of Chalk.
@@ -41,7 +42,7 @@ class NewerDataPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'The training log on this phone was written in format '
+                  'The training log on $thisDevice was written in format '
                   '${found ?? '?'}. This version of the app understands format '
                   '${Storage.schemaVersion}, so there is part of it here that '
                   'it cannot read.',
@@ -97,14 +98,7 @@ class NewerDataPage extends StatelessWidget {
   Future<void> _rescue(BuildContext context, AppState state) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final path = await state.rescueRawFile();
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(path)],
-          subject: 'Chalk data',
-          text: 'Chalk data',
-        ),
-      );
+      await sendFile(await state.rescueRawFile(), subject: 'Chalk data');
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Could not copy it: $e')));
     }
@@ -117,7 +111,7 @@ class NewerDataPage extends StatelessWidget {
         title: const Text('Discard what cannot be read?'),
         content: const Text(
           'Whatever the newer version added is lost as soon as anything is '
-          'saved. There is no undo, and the copy on this phone goes with it.\n\n'
+          'saved. There is no undo, and the copy on $thisDevice goes with it.\n\n'
           'Installing the newer version instead costs nothing and keeps all '
           'of it.',
         ),

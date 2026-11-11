@@ -1,11 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cross_file/cross_file.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Everything lives in one JSON document in the app's private documents dir.
 /// Writes go to a temp file first so a crash mid-save can never leave a
 /// half-written database behind.
+///
+/// This is the phone's storage. The browser build swaps in `WebStorage`, which
+/// keeps the same document in IndexedDB; nothing outside this file and that
+/// one knows which is in use, because what leaves here is a [Snapshot] or an
+/// [XFile] rather than a path on disk.
 class Storage {
   static const fileName = 'gym_tracker_data.json';
 
@@ -21,6 +27,17 @@ class Storage {
   /// half understood, which is the whole point — but it does mean the older
   /// build cannot be used at all until it is updated.
   static const schemaVersion = 1;
+
+  /// "auto-2026-09-04T22-10-31.json": sortable, and readable back as a time.
+  /// Shared by both platforms so a snapshot is named the same wherever it is.
+  static String snapshotName(DateTime at) {
+    final stamp = at
+        .toIso8601String()
+        .split('.')
+        .first
+        .replaceAll(':', '-');
+    return 'auto-$stamp.json';
+  }
 
   Future<File> file() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -63,31 +80,27 @@ class Storage {
   /// Snapshot taken after every finished workout, keeping the newest [keep].
   /// This is on-device: it rescues a bad import or a corrupt save, but it goes
   /// with the phone, so it does not replace exporting off-device.
-  Future<File> writeAutoBackup(
+  Future<void> writeAutoBackup(
     Map<String, dynamic> data, {
     int keep = 10,
   }) async {
     final dir = await _backupDir();
-    final stamp = DateTime.now()
-        .toIso8601String()
-        .split('.')
-        .first
-        .replaceAll(':', '-');
-    final file = File('${dir.path}${Platform.pathSeparator}auto-$stamp.json');
+    final file = File(
+      '${dir.path}${Platform.pathSeparator}${snapshotName(DateTime.now())}',
+    );
     await file.writeAsString(jsonEncode(data), flush: true);
 
-    for (final stale in (await listAutoBackups()).skip(keep)) {
+    for (final stale in (await _backupFiles()).skip(keep)) {
       try {
         await stale.delete();
       } catch (_) {
         // A snapshot we cannot prune is not worth failing a workout over.
       }
     }
-    return file;
   }
 
   /// Newest first — the timestamp in the name sorts lexicographically.
-  Future<List<File>> listAutoBackups() async {
+  Future<List<File>> _backupFiles() async {
     final dir = await _backupDir();
     final files =
         (await dir.list().toList())
@@ -98,33 +111,52 @@ class Storage {
     return files;
   }
 
+  /// Newest first.
+  Future<List<Snapshot>> listAutoBackups() async => [
+    for (final f in await _backupFiles())
+      Snapshot(f.uri.pathSegments.last, f.readAsString),
+  ];
+
   /// Copies the live database out, byte for byte, for sharing.
   ///
   /// Deliberately not [writeExport]: that re-serialises through this build's
   /// own model, which is exactly what must not happen to a document written by
   /// a newer version. The point is to rescue the file intact.
-  Future<File> copyForExport(String name) async {
+  Future<XFile> copyForExport(String name) async {
     final dir = await getTemporaryDirectory();
     final target = File('${dir.path}${Platform.pathSeparator}$name');
-    return (await file()).copy(target.path);
+    return XFile((await (await file()).copy(target.path)).path);
   }
 
   /// Writes plain text for sharing — the CSV log — and returns it.
-  Future<File> writeTextExport(String text, String name) async {
+  Future<XFile> writeTextExport(String text, String name) async {
     final dir = await getTemporaryDirectory();
     final f = File('${dir.path}${Platform.pathSeparator}$name');
     await f.writeAsString(text, flush: true);
-    return f;
+    return XFile(f.path);
   }
 
   /// Writes a copy for sharing and returns it.
-  Future<File> writeExport(Map<String, dynamic> data, String name) async {
+  Future<XFile> writeExport(Map<String, dynamic> data, String name) async {
     final dir = await getTemporaryDirectory();
     final f = File('${dir.path}${Platform.pathSeparator}$name');
     await f.writeAsString(
       const JsonEncoder.withIndent('  ').convert(data),
       flush: true,
     );
-    return f;
+    return XFile(f.path);
   }
+}
+
+/// One automatic snapshot, wherever the platform happens to keep it.
+class Snapshot {
+  Snapshot(this.name, this._read);
+
+  /// As written by [Storage.snapshotName], so the time can be read back out.
+  final String name;
+
+  final Future<String> Function() _read;
+
+  /// The document as it was saved.
+  Future<String> read() => _read();
 }

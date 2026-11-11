@@ -46,6 +46,11 @@ dependencies:
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
   wakelock_plus: ^1.6.1
+  # Exports leave as an XFile, so the browser build can hand over bytes where
+  # the phone hands over a path.
+  cross_file: ^0.3.5+5
+  # IndexedDB, for the browser build's storage.
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

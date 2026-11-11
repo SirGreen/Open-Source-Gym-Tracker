@@ -2,14 +2,17 @@
 
 The mark is the app's initial, drawn as one heavy chalk stroke.
 
-    python tool/make_icons.py
+    python tool/make_icons.py        # everything
+    python tool/make_icons.py web    # only the browser build's icons
 
 Writes legacy, round, adaptive-foreground and themed-monochrome layers for
-every density, plus a 1024 master under assets/icon/.
+every density, plus a 1024 master under assets/icon/, plus the web build's
+favicon and install icons under web/.
 """
 
 import math
 import os
+import sys
 from PIL import Image, ImageDraw
 
 SS = 8  # supersample factor — PIL does not antialias its own drawing
@@ -150,6 +153,33 @@ def main():
     marked(1024, ADAPTIVE_MARK).save('assets/icon/app_icon_foreground.png')
     print('master: assets/icon/app_icon.png')
 
+    web_icons()
+
+
+def maskable(canvas):
+    """Full-bleed square for an installed web app.
+
+    The phone crops it to its own shape, like an adaptive icon, so the
+    background runs to every edge and the mark stays well inside the safe
+    circle. iOS fills transparent corners with black, so it gets this too.
+    """
+    img = vgrad((canvas, canvas), BG_TOP, BG_BOT).convert('RGBA')
+    img.alpha_composite(marked(canvas, ADAPTIVE_MARK))
+    return img
+
+
+def web_icons():
+    icons = os.path.join('web', 'icons')
+    os.makedirs(icons, exist_ok=True)
+    for px in (192, 512):
+        full_icon(px, False).save(os.path.join(icons, f'Icon-{px}.png'))
+        maskable(px).save(os.path.join(icons, f'Icon-maskable-{px}.png'))
+    full_icon(48, False).save(os.path.join('web', 'favicon.png'))
+    print('web: favicon, install icons and maskable icons')
+
 
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:] == ['web']:
+        web_icons()
+    else:
+        main()

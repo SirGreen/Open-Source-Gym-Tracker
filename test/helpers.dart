@@ -1,8 +1,10 @@
 /// Fakes and fixtures shared by every test file.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:cross_file/cross_file.dart';
 import 'package:gym_tracker/data/app_state.dart';
 import 'package:gym_tracker/data/storage.dart';
 import 'package:gym_tracker/models/models.dart';
@@ -24,18 +26,17 @@ class MemoryStorage extends Storage {
   }
 
   @override
-  Future<File> writeAutoBackup(
+  Future<void> writeAutoBackup(
     Map<String, dynamic> value, {
     int keep = 10,
   }) async {
     snapshots.add(value);
-    return File('memory-snapshot-${snapshots.length}');
   }
 
   @override
-  Future<File> writeTextExport(String value, String name) async {
+  Future<XFile> writeTextExport(String value, String name) async {
     text = value;
-    return File(name);
+    return XFile.fromData(utf8.encode(value), name: name);
   }
 }
 

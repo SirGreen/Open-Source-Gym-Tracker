@@ -1,0 +1,60 @@
+# Builds the browser version of Chalk and publishes it to GitHub Pages on
+# every push to main. Pages must be set to deploy from GitHub Actions:
+# Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
+name: Deploy web app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push replaces one still queued.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # The version the app is developed against, so CI builds what was
+          # tested locally.
+          flutter-version: 3.38.7
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter analyze --no-fatal-infos
+
+      - name: Tests
+        run: flutter test
+
+      # A project site lives under /<repo-name>/, and the app has to know that
+      # to find its own files.
+      - name: Build
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

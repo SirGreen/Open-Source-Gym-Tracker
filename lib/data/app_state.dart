@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
@@ -9,6 +9,10 @@ import '../utils/formatting.dart';
 import 'progression.dart';
 import 'seed.dart';
 import 'storage.dart';
+// The phone keeps its document in a file, the browser in IndexedDB. Only the
+// default differs; tests pass their own store either way.
+import 'storage_platform.dart'
+    if (dart.library.js_interop) 'storage_web.dart';
 
 // The class is split across parts rather than separate libraries: privacy
 // in Dart is per library, so _touch and _storage stay reachable from every
@@ -346,7 +350,7 @@ class MarkerReading {
 /// rebuilds and the JSON document is written (debounced).
 class AppState extends ChangeNotifier {
   AppState({Storage? storage, DateTime Function()? clock})
-    : _storage = storage ?? Storage(),
+    : _storage = storage ?? platformStorage(),
       _clock = clock ?? DateTime.now;
 
   final Storage _storage;
@@ -431,10 +435,9 @@ class AppState extends ChangeNotifier {
 
   /// The database exactly as it sits on disk, copied out for safekeeping
   /// before anything touches it.
-  Future<String> rescueRawFile() async {
+  Future<XFile> rescueRawFile() {
     final stamp = now.toIso8601String().split('T').first;
-    final f = await _storage.copyForExport('chalk-rescued-$stamp.json');
-    return f.path;
+    return _storage.copyForExport('chalk-rescued-$stamp.json');
   }
 
   void _applySeed() {

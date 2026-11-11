@@ -1,32 +1,28 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../data/app_state.dart';
 import '../data/live_timer.dart';
+import '../data/storage.dart';
 import '../models/models.dart';
+import '../utils/device.dart';
 import '../utils/formatting.dart' as fmt;
 import 'bodyweight_page.dart';
 import 'exercise_library_page.dart';
+import 'widgets/send_file.dart';
 
-/// Writes a backup and hands it to the share sheet. Top-level because the
-/// overdue-backup card on Today offers the very same action, and a backup you
-/// have to go hunting through Settings for is one you do not take.
+/// Writes a backup and hands it over — the share sheet on a phone, a download
+/// in the browser. Top-level because the overdue-backup card on Today offers
+/// the very same action, and a backup you have to go hunting through Settings
+/// for is one you do not take.
 Future<void> exportBackup(BuildContext context, AppState state) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
-    final path = await state.exportToFile();
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(path)],
-        subject: 'Chalk backup',
-        text: 'Chalk backup',
-      ),
-    );
+    await sendFile(await state.exportToFile(), subject: 'Chalk backup');
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
   }
@@ -84,35 +80,40 @@ class SettingsPage extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
             ),
           ),
-          const _LiveTimerTile(),
-          const Divider(height: 32),
-          const _Label('TRAINING REMINDERS'),
-          SwitchListTile(
-            title: const Text('Remind me on scheduled days'),
-            subtitle: const Text(
-              'Only on days the plan asks for, and only while nothing is '
-              'logged yet',
+          // Both of these are the phone's own machinery: a status-bar chip, and
+          // alarms booked with the system. A browser has neither, and a switch
+          // that does nothing is worse than no switch.
+          if (!kIsWeb) ...[
+            const _LiveTimerTile(),
+            const Divider(height: 32),
+            const _Label('TRAINING REMINDERS'),
+            SwitchListTile(
+              title: const Text('Remind me on scheduled days'),
+              subtitle: const Text(
+                'Only on days the plan asks for, and only while nothing is '
+                'logged yet',
+              ),
+              value: s.remindTraining,
+              onChanged: (v) => state.updateSettings(remindTraining: v),
             ),
-            value: s.remindTraining,
-            onChanged: (v) => state.updateSettings(remindTraining: v),
-          ),
-          ListTile(
-            enabled: s.remindTraining,
-            leading: const Icon(Icons.schedule),
-            title: const Text('Time of day'),
-            subtitle: Text(_clockLabel(s.remindHour, s.remindMinute)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: s.remindTraining ? () => _pickTime(context, state) : null,
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: Text(
-              'Booked a fortnight ahead and rebuilt whenever the plan or the '
-              'log changes, so training in the morning cancels the evening '
-              'nudge. Rest days and days you have written off are skipped.',
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ListTile(
+              enabled: s.remindTraining,
+              leading: const Icon(Icons.schedule),
+              title: const Text('Time of day'),
+              subtitle: Text(_clockLabel(s.remindHour, s.remindMinute)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: s.remindTraining ? () => _pickTime(context, state) : null,
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Text(
+                'Booked a fortnight ahead and rebuilt whenever the plan or the '
+                'log changes, so training in the morning cancels the evening '
+                'nudge. Rest days and days you have written off are skipped.',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+            ),
+          ],
           const Divider(height: 32),
           const _Label('AUTOMATIC PROGRESSION'),
           SwitchListTile(
@@ -211,7 +212,11 @@ class SettingsPage extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.ios_share),
             title: const Text('Export backup'),
-            subtitle: const Text('Share a JSON file with everything in it'),
+            subtitle: const Text(
+              kIsWeb
+                  ? 'Download a JSON file with everything in it'
+                  : 'Share a JSON file with everything in it',
+            ),
             onTap: () => exportBackup(context, state),
           ),
           ListTile(
@@ -230,7 +235,7 @@ class SettingsPage extends StatelessWidget {
             leading: const Icon(Icons.restore),
             title: const Text('Restore a snapshot'),
             subtitle: const Text(
-              'Automatic copies kept on this phone after every workout',
+              'Automatic copies kept in $thisDevice after every workout',
             ),
             onTap: () => _restoreSnapshot(context, state),
           ),
@@ -251,13 +256,13 @@ class SettingsPage extends StatelessWidget {
                   child: Text(
                     switch (state.daysSinceExport) {
                       null =>
-                        'Nothing has ever left this phone. Snapshots live '
+                        'Nothing has ever left $thisDevice. Snapshots live '
                             'here too, so they go with it — export one somewhere '
                             'else.',
-                      0 => 'Exported off this phone today.',
-                      1 => 'Last exported off this phone yesterday.',
+                      0 => 'Exported off $thisDevice today.',
+                      1 => 'Last exported off $thisDevice yesterday.',
                       final days =>
-                        'Last exported off this phone $days days '
+                        'Last exported off $thisDevice $days days '
                             'ago.',
                     },
                     style: TextStyle(
@@ -363,7 +368,7 @@ class SettingsPage extends StatelessWidget {
       return;
     }
 
-    final chosen = await showModalBottomSheet<File>(
+    final chosen = await showModalBottomSheet<Snapshot>(
       context: context,
       showDragHandle: true,
       useSafeArea: true,
@@ -378,11 +383,11 @@ class SettingsPage extends StatelessWidget {
                 style: TextStyle(fontSize: 13),
               ),
             ),
-            for (final file in snapshots)
+            for (final snapshot in snapshots)
               ListTile(
                 leading: const Icon(Icons.history),
-                title: Text(_snapshotLabel(file)),
-                onTap: () => Navigator.of(context).pop(file),
+                title: Text(_snapshotLabel(snapshot)),
+                onTap: () => Navigator.of(context).pop(snapshot),
               ),
           ],
         ),
@@ -401,8 +406,8 @@ class SettingsPage extends StatelessWidget {
   }
 
   /// "auto-2026-09-04T22-10-31.json" -> "4 Sep 2026, 22:10"
-  static String _snapshotLabel(File file) {
-    final name = file.uri.pathSegments.last;
+  static String _snapshotLabel(Snapshot snapshot) {
+    final name = snapshot.name;
     final stamp = name
         .replaceFirst('auto-', '')
         .replaceFirst('.json', '')
@@ -450,13 +455,9 @@ class SettingsPage extends StatelessWidget {
   Future<void> _exportCsv(BuildContext context, AppState state) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final path = await state.exportCsvToFile();
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(path)],
-          subject: 'Chalk training log',
-          text: 'Chalk training log',
-        ),
+      await sendFile(
+        await state.exportCsvToFile(),
+        subject: 'Chalk training log',
       );
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
